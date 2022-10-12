@@ -193,6 +193,8 @@ for level_dir in os.listdir(FILES_TO_UPLOAD_DIR):
                 time.sleep(2)
 
                 day_button_string = scan_date.strftime("%d")
+                if day_button_string[0] == "0":
+                    day_button_string = day_button_string[1]
                 #print("day_button_string", day_button_string )
                 day_button = driver.find_element("xpath", f"//button/div[contains(.,'{day_button_string}')]")
                 day_button.click()

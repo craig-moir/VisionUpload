@@ -6,6 +6,11 @@ import datetime
 from tkinter import filedialog
 from tkinter import *
 
+import chromedriver_autoinstaller
+chromedriver_autoinstaller.install()  # Check if the current version of chromedriver exists
+                                      # and if it doesn't exist, download it automatically,
+                                      # then add chromedriver to path
+
 print(f"{'#'*80}\n{'#'*3}\n{'#'*3 + ' Vision Automatic Scan Upload Script'}\n{'#'*3}\n{'#'*80}\n")
 
 DESKTOP = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Desktop') 
@@ -37,7 +42,7 @@ print("\t", "Total size: ", total_size_bytes/(1024**3), "GB")
 print("\t", "Estimated upload time:", (30*len(all_files_to_upload) + total_size_bytes/(1024**2)/100)/60/60, "hours @ 100 MBps")
 print()
 
-driver = webdriver.Chrome(os.path.join(CURRENT_DIR, 'chromedriver.exe'))
+driver = webdriver.Chrome()
 
 
 def drop_file(filePath, target, offsetX, offsetY):

@@ -6,7 +6,7 @@ import time
 import datetime
 from tkinter import filedialog
 from tkinter import *
-import chromedriver_autoinstaller
+# import chromedriver_autoinstaller
  
 # chromedriver_autoinstaller.install()  # Check if the current version of chromedriver exists
                                       # and if it doesn't exist, download it automatically,

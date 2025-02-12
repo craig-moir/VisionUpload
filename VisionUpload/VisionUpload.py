@@ -309,6 +309,103 @@ def retry_action(action, retries=3, delay=2):
     raise Exception("Action failed after {} retries.".format(retries))
 
 
+# ------------------------- New Helper Functions for Folder Summary & Validation -------------------------
+
+
+def print_directory_tree(startpath):
+    """
+    Prints a tree-view of the directory structure starting at startpath.
+    """
+    print("\nFolder Structure Summary:")
+    for root, dirs, files in os.walk(startpath):
+        level = root.replace(startpath, "").count(os.sep)
+        indent = " " * 4 * level
+        folder_name = os.path.basename(root) if os.path.basename(root) else startpath
+        print(f"{indent}{folder_name}/")
+        subindent = " " * 4 * (level + 1)
+        for f in files:
+            print(f"{subindent}{f}")
+    print()  # Extra newline at the end
+
+
+def validate_folder_structure(parent_folder):
+    """
+    Validates that the folder structure matches the expected layout:
+      Parent Folder
+          └── Survey Folder(s)
+                   └── Level Folder(s)
+                             └── Date Folder(s) (name in ddmmyy format)
+                                        └── Scan files (excluding 'uploaded.log')
+    Returns True if valid; otherwise False.
+    """
+    valid = True
+    survey_dirs = [
+        d
+        for d in os.listdir(parent_folder)
+        if os.path.isdir(os.path.join(parent_folder, d))
+    ]
+    if not survey_dirs:
+        logging.error("No survey directories found in the parent folder.")
+        valid = False
+
+    for survey in survey_dirs:
+        survey_path = os.path.join(parent_folder, survey)
+        level_dirs = [
+            d
+            for d in os.listdir(survey_path)
+            if os.path.isdir(os.path.join(survey_path, d))
+        ]
+        if not level_dirs:
+            logging.error("Survey '%s' does not contain any level directories.", survey)
+            valid = False
+        else:
+            for level in level_dirs:
+                level_path = os.path.join(survey_path, level)
+                date_dirs = [
+                    d
+                    for d in os.listdir(level_path)
+                    if os.path.isdir(os.path.join(level_path, d))
+                ]
+                if not date_dirs:
+                    logging.error(
+                        "Level '%s' in survey '%s' does not contain any date directories.",
+                        level,
+                        survey,
+                    )
+                    valid = False
+                else:
+                    for date_dir in date_dirs:
+                        # Check for correct date format (ddmmyy)
+                        try:
+                            _ = datetime.datetime.strptime(date_dir, "%d%m%y").date()
+                        except ValueError:
+                            logging.error(
+                                "Directory '%s' in level '%s' of survey '%s' is not in ddmmyy format.",
+                                date_dir,
+                                level,
+                                survey,
+                            )
+                            valid = False
+                            continue
+                        date_path = os.path.join(level_path, date_dir)
+                        # Exclude the 'uploaded.log' file from scan files
+                        scan_files = [
+                            f
+                            for f in os.listdir(date_path)
+                            if os.path.isfile(os.path.join(date_path, f))
+                            and f != "uploaded.log"
+                        ]
+                        if not scan_files:
+                            logging.error(
+                                "Date directory '%s' in level '%s' of survey '%s' does not contain any scan files.",
+                                date_dir,
+                                level,
+                                survey,
+                            )
+                            valid = False
+    return valid
+
+
 # ------------------------- Main Process -------------------------
 
 
@@ -336,6 +433,21 @@ def main():
         return
 
     logging.info("Parent folder selected: %s", files_to_upload_dir)
+
+    # Print a summary of the directory structure.
+    print_directory_tree(files_to_upload_dir)
+
+    # Validate the folder structure.
+    if not validate_folder_structure(files_to_upload_dir):
+        logging.error("The folder structure does not match the expected layout.")
+        proceed = input(
+            "The folder structure appears invalid. Do you want to continue with the upload? (y/n): "
+        )
+        if proceed.lower() != "y":
+            logging.info("Exiting per user request.")
+            return
+    else:
+        logging.info("Folder structure appears valid.")
 
     # Calculate total size and count of files for informational purposes.
     total_size_bytes = 0

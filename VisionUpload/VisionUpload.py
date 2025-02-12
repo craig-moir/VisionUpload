@@ -30,23 +30,13 @@ from selenium.common.exceptions import (
 
 DEBUG_MODE = False  # Set to True during development to enable debug pauses
 
-# Setup logging: adjust level to logging.DEBUG during development.
+# Setup logging: if debug mode is enabled, use DEBUG; otherwise use INFO.
 logging.basicConfig(
-    level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s"
+    level=logging.DEBUG if DEBUG_MODE else logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
 )
 
 # Centralized selectors and constants.
-# Note the addition of "survey_dropdown" below.
-# SELECTORS = {
-#     "create_button": "//span[contains(.,'Create')]",
-#     "continue_button": "//span[contains(.,'Continue')]",
-#     "save_button": "//span[contains(.,'Save')]",
-#     "date_label": "//label[contains(.,'Date')]",
-#     "module_dropdown": "//*[@data-vv-name='Module']",
-#     "survey_dropdown": "//*[@data-vv-name='Survey']",
-#     "upload_area": "//*[contains(text(),'Click here to Upload')]",
-# }
-
 SELECTORS = {
     "create_button": "//button[contains(@class, 'v-btn') and .//span[normalize-space()='Create']]",
     "continue_button": "//button[contains(@class, 'v-btn') and .//span[normalize-space()='Continue']]",
@@ -148,58 +138,31 @@ def select_date(driver, scan_date, current_date):
     The method assumes the date-picker uses buttons with text containing month/year/day.
     """
     try:
-        # Click on the date input label
+        # Click on the date input field
         date_input = wait_for_clickable(driver, By.XPATH, SELECTORS["date_label"])
-        # date_input.click()
         driver.execute_script("arguments[0].click();", date_input)
         logging.debug("Clicked on date input")
 
-        # # Wait for any overlay or animation to vanish.
-        # WebDriverWait(driver, 10).until(
-        #     EC.invisibility_of_element_located(
-        #         (By.CSS_SELECTOR, "div.v-overlay__scrim")
-        #     )
-        # )
-
-        # Click on the month/year button (using current date for the top header)
-        month_year_top_str = current_date.strftime("%B %Y")
-        # month_year_top = wait_for_clickable(
-        #     driver, By.XPATH, f"//button[contains(.,'{month_year_top_str}')]"
-        # )
+        # Select the month/year header
         month_year_top = wait_for_clickable(
             driver,
             By.XPATH,
             "//div[contains(@class, 'v-date-picker-header__value')]//button",
         )
         month_year_top.click()
-        logging.debug("Selected month/year header: %s", month_year_top_str)
+        logging.debug("Clicked on month/year header")
 
-        # # Wait for any overlay or animation to vanish.
-        # WebDriverWait(driver, 10).until(
-        #     EC.invisibility_of_element_located(
-        #         (By.CSS_SELECTOR, "div.v-overlay__scrim")
-        #     )
-        # )
-        time.sleep(1)
-        # Click on the year button (using current year)
-        year_top_str = current_date.strftime("%Y")
-        # year_top = wait_for_clickable(
-        #     driver, By.XPATH, f"//button[contains(.,'{year_top_str}')]"
-        # )
+        # Wait for the year selector to appear
+        time.sleep(1.5)
+
+        # Click the year header (again using the same selector as above)
         year_top = wait_for_clickable(
             driver,
             By.XPATH,
             "//div[contains(@class, 'v-date-picker-header__value')]//button",
         )
         year_top.click()
-        logging.debug("Selected top year: %s", year_top_str)
-
-        # # Wait for any overlay or animation to vanish.
-        # WebDriverWait(driver, 10).until(
-        #     EC.invisibility_of_element_located(
-        #         (By.CSS_SELECTOR, "div.v-overlay__scrim")
-        #     )
-        # )
+        logging.debug("Clicked on year header")
 
         # Select the specific year for the scan date
         year_str = scan_date.strftime("%Y")
@@ -209,14 +172,7 @@ def select_date(driver, scan_date, current_date):
         year_button.click()
         logging.debug("Selected scan year: %s", year_str)
 
-        # # Wait for any overlay or animation to vanish.
-        # WebDriverWait(driver, 10).until(
-        #     EC.invisibility_of_element_located(
-        #         (By.CSS_SELECTOR, "div.v-overlay__scrim")
-        #     )
-        # )
-
-        # Select the month
+        # Select the desired month
         month_str = scan_date.strftime("%b")
         month_button = wait_for_clickable(
             driver, By.XPATH, f"//button/div[contains(.,'{month_str}')]"
@@ -224,27 +180,13 @@ def select_date(driver, scan_date, current_date):
         month_button.click()
         logging.debug("Selected scan month: %s", month_str)
 
-        # # Wait for any overlay or animation to vanish.
-        # WebDriverWait(driver, 10).until(
-        #     EC.invisibility_of_element_located(
-        #         (By.CSS_SELECTOR, "div.v-overlay__scrim")
-        #     )
-        # )
-
-        # Select the day (remove any leading zero)
+        # Select the desired day (removing any leading zero)
         day_str = scan_date.strftime("%d").lstrip("0")
         day_button = wait_for_clickable(
             driver, By.XPATH, f"//button/div[contains(.,'{day_str}')]"
         )
         day_button.click()
         logging.debug("Selected scan day: %s", day_str)
-
-        # # Wait for any overlay or animation to vanish.
-        # WebDriverWait(driver, 10).until(
-        #     EC.invisibility_of_element_located(
-        #         (By.CSS_SELECTOR, "div.v-overlay__scrim")
-        #     )
-        # )
 
     except TimeoutException as e:
         logging.error("Timeout while selecting date: %s", e)
@@ -386,10 +328,9 @@ def main():
     # Choose the parent folder containing survey folders using a Tkinter dialog.
     root = Tk()
     root.withdraw()
-    # files_to_upload_dir = filedialog.askdirectory(
-    #     title="Select parent folder containing survey folders to upload"
-    # )
-    files_to_upload_dir = "C:\\Users\\CraigMoir\\Downloads\\upload_test"
+    files_to_upload_dir = filedialog.askdirectory(
+        title="Select parent folder containing survey folders to upload"
+    )
     if not files_to_upload_dir:
         logging.error("No folder selected! Exiting...")
         return
@@ -496,10 +437,10 @@ def main():
                         logging.error("Error uploading file '%s': %s", scan_file, e)
                         continue
 
-                    # Optional pause to allow manual inspection during development.
-                    # debug_pause(
-                    #     "File uploaded. Press Enter to continue with the next file..."
-                    # )
+                    # Optional pause for manual inspection (only when debug mode is on)
+                    debug_pause(
+                        "File uploaded. Press Enter to continue with the next file..."
+                    )
 
     logging.info("Upload process complete.")
     driver.quit()

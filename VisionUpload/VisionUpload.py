@@ -414,12 +414,19 @@ def main():
     logging.info("#" * 80)
     logging.info("### Vision Automatic Scan Upload Script")
     logging.info("#" * 80)
-    logging.info("Select the parent folder containing the survey folders to upload.")
-    logging.info("Each survey folder should be structured as follows:")
-    logging.info("    Survey Folder")
-    logging.info("        └── Level 1 (must match the name in Vision)")
-    logging.info("             └── Date 1 (format ddmmyy, e.g., 041122)")
-    logging.info("                  └── Scan files (e.g., Scan 001.e57, Scan 002.e57)")
+    logging.info(
+        "IMPORTANT: Please select the **parent folder** that contains your survey data."
+    )
+    logging.info("The folder structure must follow the template below:")
+    logging.info("Parent Folder (the folder you select)")
+    logging.info(
+        "└── Survey Folder (e.g. 'Blanket Scan' - must match the name in Vision)"
+    )
+    logging.info(
+        "    └── Level Folder (e.g. 'Level 1' — must match the name in Vision)"
+    )
+    logging.info("        └── Date Folder (format: ddmmyy, e.g., '041122')")
+    logging.info("            └── Scan files (e.g., 'Scan 001.e57', 'Scan 002.e57')")
     logging.info("The module will be set to '%s'", MODULE_TEXT)
 
     # Choose the parent folder containing survey folders using a Tkinter dialog.

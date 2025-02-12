@@ -1,242 +1,381 @@
-from selenium import webdriver
-from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.common.by import By
+﻿#!/usr/bin/env python3
+"""
+Vision Automatic Scan Upload Script
+-------------------------------------
+This script uploads scan files to the Vision web application. It uses explicit
+waits and modular functions for improved maintainability, debugging, and development.
+It also logs progress and errors using Python's logging module.
+"""
+
 import os
 import time
 import datetime
-from tkinter import filedialog
-from tkinter import *
-# import chromedriver_autoinstaller
- 
-# chromedriver_autoinstaller.install()  # Check if the current version of chromedriver exists
-                                      # and if it doesn't exist, download it automatically,
-                                      # then add chromedriver to path
- 
-print(f"{'#'*80}\n{'#'*3}\n{'#'*3 + ' Vision Automatic Scan Upload Script'}\n{'#'*3}\n{'#'*80}\n")
- 
-DESKTOP = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Desktop')
- 
-CURRENT_DIR = os.path.dirname(os.path.realpath(__file__))
- 
-print(f"{'#'*3 + ' Select the folder containing the scan files to upload'}")
-print(f"\nThe folder must be structured as:\n{' '*4}base folder (folder which you will select)\n{' '*4}|\n{' '*4}|\n{' '*4}{'-'*4}Deck 1 (must be spelled the same as in Vision)\n{' '*8}Deck 2\n{' '*8}|\n{' '*8}|\n{' '*8}{'-'*4}Date 1 (6 number date format i.e. 041122 for 4th November 2022)\n{' '*12}Date 2\n{' '*12}|\n{' '*12}|\n{' '*12}{'-'*4}Scan 001.e57\n{' '*16}Scan 002.e57\n")
-print("### The module will be set to 'Module'\n")
- 
-root = Tk()
-root.withdraw()
-FILES_TO_UPLOAD_DIR = filedialog.askdirectory(title="Select folder containing scan files to upload")
- 
-if FILES_TO_UPLOAD_DIR == "":
-    print("No folder selected! Exiting...")
-    exit()
- 
-print("Uploading all files in", FILES_TO_UPLOAD_DIR, "\n")
-total_size_bytes = 0
-all_files_to_upload = [os.path.join(dp, f) for dp, dn, fn in os.walk(os.path.expanduser(FILES_TO_UPLOAD_DIR)) for f in fn]
-for f in all_files_to_upload:
-    stats = os.stat(os.path.join(FILES_TO_UPLOAD_DIR, f))
-    # print(f, "-", stats.st_size/(1024**3), "GB")
-    total_size_bytes += stats.st_size
-print("\nFinal upload: ")
-print("\t", "Total files:", len(all_files_to_upload))
-print("\t", "Total size: ", total_size_bytes/(1024**3), "GB")
-print("\t", "Estimated upload time:", (30*len(all_files_to_upload) + total_size_bytes/(1024**2)/100)/60/60, "hours @ 100 MBps")
-print()
- 
-driver = webdriver.Chrome()
- 
- 
-def drop_file(filePath, target, offsetX, offsetY):
-    #if(!filePath.exists())
-    #    throw new WebDriverException("File not found: " + filePath.toString());
- 
-    #driver = ((RemoteWebElement)target).getWrappedDriver()
-    #wait = WebDriverWait(driver, 30)
- 
-    JS_DROP_FILE = \
-        "var target = arguments[0]," + \
-        "    offsetX = arguments[1]," + \
-        "    offsetY = arguments[2]," + \
-        "    document = target.ownerDocument || document," + \
-        "    window = document.defaultView || window;" + \
-        "" + \
-        "var input = document.createElement('INPUT');" + \
-        "input.type = 'file';" + \
-        "input.style.display = 'none';" + \
-        "input.onchange = function () {" + \
-        "  var rect = target.getBoundingClientRect()," + \
-        "      x = rect.left + (offsetX || (rect.width >> 1))," + \
-        "      y = rect.top + (offsetY || (rect.height >> 1))," + \
-        "      dataTransfer = { files: this.files };" + \
-        "" + \
-        "  ['dragenter', 'dragover', 'drop'].forEach(function (name) {" + \
-        "    var evt = document.createEvent('MouseEvent');" + \
-        "    evt.initMouseEvent(name, !0, !0, window, 0, 0, 0, x, y, !1, !1, !1, !1, 0, null);" + \
-        "    evt.dataTransfer = dataTransfer;" + \
-        "    target.dispatchEvent(evt);" + \
-        "  });" + \
-        "" + \
-        "  setTimeout(function () { document.body.removeChild(input); }, 25);" + \
-        "};" + \
-        "document.body.appendChild(input);" + \
-        "return input;"
- 
-    input =  driver.execute_script(JS_DROP_FILE, target, offsetX, offsetY);
-    input.send_keys(filePath);
-    #wait.until(ExpectedConditions.stalenessOf(input));
- 
- 
-driver.get("http://gdi.vision")
- 
-CREATE_BUTTON_XPATH = "//span[contains(.,'Create')]"
-CONTINUE_BUTTON_XPATH = "//span[contains(.,'Continue')]"
-UPLOAD_AREA_XPATH = "//*[contains(text(),'Click here to Upload')]"
-SAVE_BUTTON_XPATH = "//span[contains(.,'Save')]"
-#SELECT_DROPDOWN_XPATH = "/html/body/div[1]/div[1]/div[7]/div/div[1]/div[2]/div/div/div[3]/div[1]/div/div[1]/div[1]/input[1]"
- 
-print(f"{'#'*80}\n{'#'*3}\n{'#'*3 + ' Log in to Vision and navigate to the scan upload page...'}\n{'#'*3 + ' Press return when you are ready to continue'}\n{'#'*3}\n{'#'*80}\n")
- 
-now = input("proceed?")
- 
- 
-# MODULE_TEXT = input("What is the module: ")
+import logging
+from tkinter import filedialog, Tk
+
+from selenium import webdriver
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.common.by import By
+
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+
+from selenium.common.exceptions import TimeoutException, NoSuchElementException, WebDriverException
+
+# ------------------------- Configuration & Constants -------------------------
+
+DEBUG_MODE = False
+
+# Setup logging: adjust level to logging.DEBUG during development.
+logging.basicConfig(level=logging.DEBUG,
+                    format='%(asctime)s - %(levelname)s - %(message)s')
+
+# Centralized selectors and constants:
+SELECTORS = {
+    "create_button": "//span[contains(.,'Create')]",
+    "continue_button": "//span[contains(.,'Continue')]",
+    "save_button": "//span[contains(.,'Save')]",
+    "date_label": "//label[contains(.,'Date')]",
+    "module_dropdown": "//*[@data-vv-name='Module']",
+    "upload_area": "//*[contains(text(),'Click here to Upload')]",
+}
+
 MODULE_TEXT = "Module"
- 
-for level_dir in os.listdir(FILES_TO_UPLOAD_DIR):
-    print(f"### Checking that {level_dir} exists")
- 
+VISION_URL = "http://dev.gdi.vision"
+
+# ------------------------- Helper Functions -------------------------
+
+def debug_pause(message="DEBUG MODE: Press Enter to continue..."):
+    """Pauses execution if DEBUG_MODE is True."""
+    if DEBUG_MODE:
+        input(message)
+
+
+def wait_for_element(driver, by, value, timeout=10):
+    """Waits for an element to be present and returns it."""
+    return WebDriverWait(driver, timeout).until(
+        EC.presence_of_element_located((by, value))
+    )
+
+
+def wait_for_clickable(driver, by, value, timeout=10):
+    """Waits for an element to be clickable and returns it."""
+    return WebDriverWait(driver, timeout).until(
+        EC.element_to_be_clickable((by, value))
+    )
+
+
+def drop_file(driver, file_path, target, offsetX=0, offsetY=0):
+    """
+    Simulates drag-and-drop file upload by injecting a hidden file input.
+    """
+    JS_DROP_FILE = (
+        "var target = arguments[0],"
+        "    offsetX = arguments[1],"
+        "    offsetY = arguments[2],"
+        "    document = target.ownerDocument || document,"
+        "    window = document.defaultView || window;"
+        "var input = document.createElement('INPUT');"
+        "input.type = 'file';"
+        "input.style.display = 'none';"
+        "input.onchange = function () {"
+        "  var rect = target.getBoundingClientRect(),"
+        "      x = rect.left + (offsetX || (rect.width >> 1)),"
+        "      y = rect.top + (offsetY || (rect.height >> 1)),"
+        "      dataTransfer = { files: this.files };"
+        "  ['dragenter', 'dragover', 'drop'].forEach(function (name) {"
+        "    var evt = document.createEvent('MouseEvent');"
+        "    evt.initMouseEvent(name, true, true, window, 0, 0, 0, x, y, false, false, false, false, 0, null);"
+        "    evt.dataTransfer = dataTransfer;"
+        "    target.dispatchEvent(evt);"
+        "  });"
+        "  setTimeout(function () { document.body.removeChild(input); }, 25);"
+        "};"
+        "document.body.appendChild(input);"
+        "return input;"
+    )
     try:
- 
-        level_button = driver.find_element("xpath", f"//tr/td[contains(.,'{level_dir}')]")
+        input_element = driver.execute_script(JS_DROP_FILE, target, offsetX, offsetY)
+        input_element.send_keys(file_path)
+    except WebDriverException as e:
+        logging.error("Error dropping file: %s", e)
+        raise
+
+
+def login_to_vision(driver, url):
+    """
+    Navigates to the Vision login page and waits for the user to log in manually.
+    """
+    driver.get(url)
+    logging.info("Navigated to %s", url)
+    input("Log in to Vision and then press Enter to continue...")  # Manual login step
+
+
+def navigate_to_level(driver, level_dir):
+    """
+    Attempts to locate and click on a level button (i.e. Deck) on the Vision page.
+    """
+    try:
+        level_button = wait_for_clickable(driver, By.XPATH, f"//tr/td[contains(.,'{level_dir}')]")
         level_button.click()
-        #print("Clicking CREATE")
- 
+        logging.info("Clicked on level '%s'", level_dir)
+    except TimeoutException:
+        logging.error("Level '%s' not found on the page.", level_dir)
+        raise
+
+
+def select_date(driver, scan_date, current_date):
+    """
+    Selects the scan date by interacting with the date-picker.
+    The method assumes the date-picker uses buttons with text containing month/year/day.
+    """
+    try:
+        # Click on the date input label
+        date_input = wait_for_clickable(driver, By.XPATH, SELECTORS["date_label"])
+        date_input.click()
+        logging.debug("Clicked on date input")
+
+        # Click on the month/year button (using current date for the top header)
+        month_year_top_str = current_date.strftime("%B %Y")
+        month_year_top = wait_for_clickable(driver, By.XPATH, f"//button[contains(.,'{month_year_top_str}')]")
+        month_year_top.click()
+        logging.debug("Selected month/year header: %s", month_year_top_str)
+
+        # Click on the year button (using current year)
+        year_top_str = current_date.strftime("%Y")
+        year_top = wait_for_clickable(driver, By.XPATH, f"//button[contains(.,'{year_top_str}')]")
+        year_top.click()
+        logging.debug("Selected top year: %s", year_top_str)
+
+        # Select the specific year for the scan date
+        year_str = scan_date.strftime("%Y")
+        year_button = wait_for_clickable(driver, By.XPATH, f"//li[contains(.,'{year_str}')]")
+        year_button.click()
+        logging.debug("Selected scan year: %s", year_str)
+
+        # Select the month
+        month_str = scan_date.strftime("%b")
+        month_button = wait_for_clickable(driver, By.XPATH, f"//button/div[contains(.,'{month_str}')]")
+        month_button.click()
+        logging.debug("Selected scan month: %s", month_str)
+
+        # Select the day (remove any leading zero)
+        day_str = scan_date.strftime("%d").lstrip("0")
+        day_button = wait_for_clickable(driver, By.XPATH, f"//button/div[contains(.,'{day_str}')]")
+        day_button.click()
+        logging.debug("Selected scan day: %s", day_str)
+
+    except TimeoutException as e:
+        logging.error("Timeout while selecting date: %s", e)
+        raise
+
+
+def select_module(driver, module_text):
+    """
+    Finds the module dropdown, sends the module text, and confirms the selection.
+    """
+    try:
+        dropdown = wait_for_clickable(driver, By.XPATH, SELECTORS["module_dropdown"])
+        dropdown.clear()
+        dropdown.send_keys(module_text)
+        logging.debug("Entered module text: %s", module_text)
+        dropdown.send_keys(Keys.RETURN)
+        logging.debug("Confirmed module selection")
+    except TimeoutException:
+        logging.error("Module dropdown not found.")
+        raise
+
+
+def upload_scan_file(driver, file_path, scan_date, module_text):
+    """
+    Executes the full sequence to upload a single scan file.
+    """
+    current_date = datetime.datetime.now()
+
+    # Click the "Create" button (using the 3rd instance of the element, per original script)
+    try:
+        create_buttons = WebDriverWait(driver, 10).until(
+            EC.presence_of_all_elements_located((By.XPATH, SELECTORS["create_button"]))
+        )
+        if len(create_buttons) < 3:
+            raise Exception("Not enough 'Create' buttons found.")
+        create_button = create_buttons[2]
+        WebDriverWait(driver, 10).until(
+            EC.element_to_be_clickable((By.XPATH, SELECTORS["create_button"]))
+        )
+        create_button.click()
+        logging.info("Clicked Create button")
+    except TimeoutException as e:
+        logging.error("Create button not clickable: %s", e)
+        raise
+
+    # Click the "Continue" button
+    try:
+        continue_button = wait_for_clickable(driver, By.XPATH, SELECTORS["continue_button"])
+        continue_button.click()
+        logging.info("Clicked Continue button")
+    except TimeoutException:
+        logging.error("Continue button not clickable.")
+        raise
+
+    # Set the scan date using the date picker
+    select_date(driver, scan_date, current_date)
+
+    # Set the module field
+    select_module(driver, module_text)
+
+    # Locate the drop area (by class name) and drop the file
+    try:
+        drop_area = wait_for_clickable(driver, By.CLASS_NAME, "drop")
+        drop_file(driver, file_path, drop_area)
+        logging.info("Dropped file: %s", file_path)
+    except Exception as e:
+        logging.error("Error during file drop: %s", e)
+        raise
+
+    # Wait until the upload completes (i.e. "Uploading" text is gone)
+    try:
+        WebDriverWait(driver, 60).until_not(
+            EC.presence_of_element_located((By.XPATH, "//*[contains(text(),'Uploading')]"))
+        )
+        logging.info("File upload completed for %s", file_path)
+    except TimeoutException:
+        logging.warning("Upload may be taking too long for file %s", file_path)
+
+    # Click the "Save" button
+    try:
+        save_button = wait_for_clickable(driver, By.XPATH, SELECTORS["save_button"])
+        save_button.click()
+        logging.info("Clicked Save button for %s", file_path)
+    except TimeoutException:
+        logging.error("Save button not clickable for %s", file_path)
+        raise
+
+
+def retry_action(action, retries=3, delay=2):
+    """
+    Tries to perform an action up to 'retries' times before failing.
+    """
+    for attempt in range(retries):
         try:
-            for date_dir in os.listdir(os.path.join(FILES_TO_UPLOAD_DIR, level_dir)):
-                scan_date = datetime.datetime.strptime(date_dir, "%d%m%y").date()
-        except:
-            print(f"Invalid date format detected! Could not convert {os.path.join(level_dir/date_dir)} to a valid date! The date must be formatted as a 6 digit date ddmmyy! Exiting...")
-            exit()
-        time.sleep(3)
- 
-    except:
- 
-        print(f"Can't find {level_dir} button, Are you sure it is spelled the same as in Vision? Exiting...")
-        exit()
- 
- 
-for level_dir in os.listdir(FILES_TO_UPLOAD_DIR):
-    print(f"{'#'*80}\n{'#'*3}\n{'#'*3 + ' Level: {level_dir}'}\n{'#'*3}\n{'#'*80}\n")
- 
-    level_button = driver.find_element("xpath", f"//tr/td[contains(.,'{level_dir}')]")
-    level_button.click()
- 
-    for date_dir in os.listdir(os.path.join(FILES_TO_UPLOAD_DIR, level_dir)):
-        scan_date = datetime.datetime.strptime(date_dir, "%d%m%y").date()
-        date_string = scan_date.strftime("%d-%b-%Y")
-        print("### Date:", date_string, "-", len(os.listdir(os.path.join(FILES_TO_UPLOAD_DIR, level_dir, date_dir))), "scan files", "\n")
- 
-        log_filename = os.path.join(FILES_TO_UPLOAD_DIR, level_dir, date_dir, "uploaded.log")
+            return action()
+        except Exception as e:
+            logging.warning("Attempt %d failed: %s", attempt + 1, e)
+            time.sleep(delay)
+    raise Exception("Action failed after {} retries.".format(retries))
+
+
+# ------------------------- Main Process -------------------------
+
+def main():
+    # Display introductory information in the log.
+    logging.info("#" * 80)
+    logging.info("### Vision Automatic Scan Upload Script")
+    logging.info("#" * 80)
+    logging.info("Select the folder containing the scan files to upload.")
+    logging.info("The folder must be structured as follows:")
+    logging.info("    base_folder (selected folder)")
+    logging.info("        └── Deck 1 (must match the name in Vision)")
+    logging.info("             └── Date 1 (format ddmmyy, e.g., 041122)")
+    logging.info("                  └── Scan files (e.g., Scan 001.e57, Scan 002.e57)")
+    logging.info("The module will be set to '%s'", MODULE_TEXT)
+
+    # Choose the folder containing scan files using a Tkinter dialog.
+    root = Tk()
+    root.withdraw()
+    files_to_upload_dir = filedialog.askdirectory(title="Select folder containing scan files to upload")
+    if not files_to_upload_dir:
+        logging.error("No folder selected! Exiting...")
+        return
+
+    logging.info("Uploading all files in: %s", files_to_upload_dir)
+
+    # Calculate total size and count of files for informational purposes.
+    total_size_bytes = 0
+    all_files = []
+    for dp, dn, filenames in os.walk(files_to_upload_dir):
+        for f in filenames:
+            file_full_path = os.path.join(dp, f)
+            all_files.append(file_full_path)
+            total_size_bytes += os.path.getsize(file_full_path)
+    logging.info("Final upload: Total files: %d, Total size: %.2f GB",
+                 len(all_files), total_size_bytes / (1024 ** 3))
+    estimated_time = (30 * len(all_files) + total_size_bytes / (1024 ** 2) / 100) / 3600
+    logging.info("Estimated upload time: %.2f hours @ 100 MBps", estimated_time)
+
+    # Initialize the Selenium Chrome driver.
+    driver = webdriver.Chrome()
+    driver.maximize_window()
+
+    # Log in to Vision (manual step).
+    login_to_vision(driver, VISION_URL)
+
+    # Loop over each level (Deck) directory.
+    for level_dir in os.listdir(files_to_upload_dir):
+        level_path = os.path.join(files_to_upload_dir, level_dir)
+        if not os.path.isdir(level_path):
+            continue
+
+        logging.info("Checking that level '%s' exists in Vision", level_dir)
         try:
-            with open(log_filename, "r") as log_file:
-                uploaded_files = log_file.readlines()
-        except:
-            uploaded_files = []
- 
-        print("uploaded already", uploaded_files)
- 
-        for scan_file in os.listdir(os.path.join(FILES_TO_UPLOAD_DIR, level_dir, date_dir)):
-            if scan_file == "uploaded.log":
+            navigate_to_level(driver, level_dir)
+        except Exception as e:
+            logging.error("Skipping level '%s' due to error: %s", level_dir, e)
+            continue
+
+        # Loop over each date directory within the current level.
+        for date_dir in os.listdir(level_path):
+            date_path = os.path.join(level_path, date_dir)
+            if not os.path.isdir(date_path):
                 continue
-            if scan_file in [f.strip() for f in uploaded_files]:
-                print(f"{scan_file} has already been uploaded! skipping...")
-                continue
- 
-            print("# Uploading", scan_file)
- 
             try:
- 
-                current_date = datetime.datetime.now()
-                create = driver.find_elements("xpath", CREATE_BUTTON_XPATH)[2]
-                create.click()
-                #print("Clicking CREATE")
-                time.sleep(3)
- 
-                continue_ = driver.find_element("xpath", CONTINUE_BUTTON_XPATH)
-                continue_.click()
-                #("Clicking CONTINUE")
-                time.sleep(2)
- 
-                date_input = driver.find_element("xpath", "//label[contains(.,'Date')]")
-                date_input.click()
-                time.sleep(2)
-                month_year_top_button_string = current_date.strftime("%B %Y")
-                #print("month_year_top_button_string", month_year_top_button_string )
-                month_year_top_button = driver.find_element("xpath", f"//button[contains(.,'{month_year_top_button_string}')]")
-                month_year_top_button.click()
-                time.sleep(2)
- 
-                year_top_button_string = current_date.strftime("%Y")
-                #print("year_top_button_string", year_top_button_string )
-                year_top_button = driver.find_element("xpath", f"//button[contains(.,'{year_top_button_string}')]")
-                year_top_button.click()
-                time.sleep(2)
- 
-                year_button_string = scan_date.strftime("%Y")
-                #print("year_button_string", year_button_string )
-                year_button = driver.find_element("xpath", f"//li[contains(.,'{year_button_string}')]")
-                year_button.click()
-                time.sleep(2)
- 
-                month_button_string = scan_date.strftime("%b")
-                #print("month_button_string", month_button_string )
-                month_button = driver.find_element("xpath", f"//button/div[contains(.,'{month_button_string}')]")
-                month_button.click()
-                time.sleep(2)
- 
-                day_button_string = scan_date.strftime("%d")
-                if day_button_string[0] == "0":
-                    day_button_string = day_button_string[1]
-                #print("day_button_string", day_button_string )
-                day_button = driver.find_element("xpath", f"//button/div[contains(.,'{day_button_string}')]")
-                day_button.click()
-                #print("clicking date")
-                time.sleep(2)
- 
-                dropdown = driver.find_element("xpath", "//*[@data-vv-name='Module']")
-                dropdown.send_keys(MODULE_TEXT)
-                print("sending module text")
-                time.sleep(2)
-                dropdown.send_keys(Keys.RETURN)
-                print("sending return")
-                time.sleep(2)
- 
-                # drop_area = driver.find_element("xpath", "//*[contains(text(),'Click')]")
-                drop_area = driver.find_element(By.CLASS_NAME, "drop")
-                print("drop area:", drop_area)
-                drop_file(os.path.join(FILES_TO_UPLOAD_DIR, level_dir, date_dir, scan_file), drop_area, 0, 0)
-                print("dropping file")
-                time.sleep(2)
- 
-                while 1:
-                    try:
-                        upload_element = driver.find_element("xpath", "//*[contains(text(),'Uploading')]")
-                        # print("upload element", upload_element)
-                        time.sleep(0.1)
-                    except Exception as e:
-                        # print("couldn't find element", e)
-                        break
- 
-                time.sleep(2)
- 
-                save = driver.find_element("xpath", SAVE_BUTTON_XPATH)
-                save.click()
-                print("Clicking Save")
-                time.sleep(5)
- 
-                with open(log_filename, "a") as myfile:
-                    myfile.write(scan_file + "\n")
- 
- 
-            except Exception as e:
-                print("error:", e)
+                scan_date = datetime.datetime.strptime(date_dir, "%d%m%y").date()
+            except ValueError:
+                logging.error("Invalid date format for directory '%s'. Must be ddmmyy. Skipping...", date_dir)
+                continue
+
+            date_string = scan_date.strftime("%d-%b-%Y")
+            logging.info("Processing Level: '%s', Date: %s", level_dir, date_string)
+
+            # Load (or initialize) a log file to track already uploaded files.
+            log_filename = os.path.join(date_path, "uploaded.log")
+            try:
+                with open(log_filename, "r") as log_file:
+                    uploaded_files = [line.strip() for line in log_file.readlines()]
+            except IOError:
+                uploaded_files = []
+
+            # Loop over each scan file in the date directory.
+            for scan_file in os.listdir(date_path):
+                if scan_file == "uploaded.log":
+                    continue
+                if scan_file in uploaded_files:
+                    logging.info("File '%s' already uploaded. Skipping...", scan_file)
+                    continue
+
+                file_path = os.path.join(date_path, scan_file)
+                logging.info("Uploading file: %s", file_path)
+
+                try:
+                    # Use retry_action to handle intermittent issues.
+                    retry_action(lambda: upload_scan_file(driver, file_path, scan_date, MODULE_TEXT),
+                                 retries=3, delay=2)
+                    # Log the successful upload.
+                    with open(log_filename, "a") as log_file:
+                        log_file.write(scan_file + "\n")
+                except Exception as e:
+                    logging.error("Error uploading file '%s': %s", scan_file, e)
+                    continue
+
+                # Optional pause to allow manual inspection during development.
+                debug_pause("File uploaded. Press Enter to continue with the next file...")
+
+    logging.info("Upload process complete.")
+    driver.quit()
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except Exception as exc:
+        logging.exception("An unexpected error occurred: %s", exc)

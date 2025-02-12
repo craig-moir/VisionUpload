@@ -49,6 +49,7 @@ SELECTORS = {
 
 MODULE_TEXT = "Module"
 VISION_URL = "http://dev.gdi.vision"
+UPLOADED_LOG_FILENAME = "uploaded.log"
 
 # ------------------------- Helper Functions -------------------------
 
@@ -314,7 +315,8 @@ def retry_action(action, retries=3, delay=2):
 
 def print_directory_tree(startpath):
     """
-    Prints a tree-view of the directory structure starting at startpath.
+    Prints a tree-view of the directory structure starting at startpath,
+    excluding any log files.
     """
     print("\nFolder Structure Summary:")
     for root, dirs, files in os.walk(startpath):
@@ -324,6 +326,8 @@ def print_directory_tree(startpath):
         print(f"{indent}{folder_name}/")
         subindent = " " * 4 * (level + 1)
         for f in files:
+            if f == UPLOADED_LOG_FILENAME:
+                continue  # Skip printing log files
             print(f"{subindent}{f}")
     print()  # Extra newline at the end
 
@@ -335,7 +339,7 @@ def validate_folder_structure(parent_folder):
           └── Survey Folder(s)
                    └── Level Folder(s)
                              └── Date Folder(s) (name in ddmmyy format)
-                                        └── Scan files (excluding 'uploaded.log')
+                                        └── Scan files (excluding log files)
     Returns True if valid; otherwise False.
     """
     valid = True
@@ -388,12 +392,12 @@ def validate_folder_structure(parent_folder):
                             valid = False
                             continue
                         date_path = os.path.join(level_path, date_dir)
-                        # Exclude the 'uploaded.log' file from scan files
+                        # Exclude the uploaded log file from scan files
                         scan_files = [
                             f
                             for f in os.listdir(date_path)
                             if os.path.isfile(os.path.join(date_path, f))
-                            and f != "uploaded.log"
+                            and f != UPLOADED_LOG_FILENAME
                         ]
                         if not scan_files:
                             logging.error(
@@ -520,7 +524,7 @@ def main():
                 logging.info("Processing Level: '%s', Date: %s", level_dir, date_string)
 
                 # Load (or initialize) a log file to track already uploaded files.
-                log_filename = os.path.join(date_path, "uploaded.log")
+                log_filename = os.path.join(date_path, UPLOADED_LOG_FILENAME)
                 try:
                     with open(log_filename, "r") as log_file:
                         uploaded_files = [line.strip() for line in log_file.readlines()]
@@ -529,7 +533,7 @@ def main():
 
                 # Loop over each scan file in the date directory.
                 for scan_file in os.listdir(date_path):
-                    if scan_file == "uploaded.log":
+                    if scan_file == UPLOADED_LOG_FILENAME:
                         continue
                     if scan_file in uploaded_files:
                         logging.info(

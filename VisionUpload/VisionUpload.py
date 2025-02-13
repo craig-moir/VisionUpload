@@ -1,10 +1,6 @@
 ﻿#!/usr/bin/env python3
 """
 Vision Automatic Scan Upload Script
--------------------------------------
-This script uploads scan files to the Vision web application. It uses explicit
-waits and modular functions for improved maintainability, debugging, and development.
-It also logs progress and errors using Python's logging module.
 """
 
 import os

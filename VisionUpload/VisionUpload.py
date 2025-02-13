@@ -48,7 +48,7 @@ SELECTORS = {
 }
 
 MODULE_TEXT = "Module"
-VISION_URL = "http://dev.gdi.vision"
+VISION_URL = "http://gdi.vision"
 UPLOADED_LOG_FILENAME = "uploaded.log"
 
 # ------------------------- Helper Functions -------------------------

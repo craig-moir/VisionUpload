@@ -131,57 +131,52 @@ def navigate_to_level(driver, level_dir):
 
 def select_date(driver, scan_date, current_date):
     """
-    Selects the scan date by interacting with the date-picker.
-    The method assumes the date-picker uses buttons with text containing month/year/day.
+    Selects the scan date by interacting with a Vuetify date-picker.
+    This version narrows the search for the day button to the date-picker table container.
     """
     try:
-        # Click on the date input field
+        # Click on the date input field.
         date_input = wait_for_clickable(driver, By.XPATH, SELECTORS["date_label"])
         driver.execute_script("arguments[0].click();", date_input)
         logging.debug("Clicked on date input")
 
         # Select the month/year header
-        month_year_top = wait_for_clickable(
-            driver,
-            By.XPATH,
-            "//div[contains(@class, 'v-date-picker-header__value')]//button",
+        header_button_xpath = (
+            "//div[contains(@class, 'v-date-picker-header__value')]//button"
         )
-        month_year_top.click()
+        header_button = wait_for_clickable(driver, By.XPATH, header_button_xpath)
+        header_button.click()
         logging.debug("Clicked on month/year header")
 
         # Wait for the year selector to appear
         time.sleep(1.5)
 
-        # Click the year header (again using the same selector as above)
-        year_top = wait_for_clickable(
-            driver,
-            By.XPATH,
-            "//div[contains(@class, 'v-date-picker-header__value')]//button",
-        )
-        year_top.click()
+        # Click the header again if necessary to switch to the year selection view.
+        header_button = wait_for_clickable(driver, By.XPATH, header_button_xpath)
+        header_button.click()
         logging.debug("Clicked on year header")
 
         # Select the specific year for the scan date
         year_str = scan_date.strftime("%Y")
-        year_button = wait_for_clickable(
-            driver, By.XPATH, f"//li[contains(.,'{year_str}')]"
-        )
+        year_xpath = f"//li[contains(.,'{year_str}')]"
+        year_button = wait_for_clickable(driver, By.XPATH, year_xpath)
         year_button.click()
         logging.debug("Selected scan year: %s", year_str)
 
         # Select the desired month
         month_str = scan_date.strftime("%b")
-        month_button = wait_for_clickable(
-            driver, By.XPATH, f"//button/div[contains(.,'{month_str}')]"
-        )
+        month_xpath = f"//button/div[contains(.,'{month_str}')]"
+        month_button = wait_for_clickable(driver, By.XPATH, month_xpath)
         month_button.click()
         logging.debug("Selected scan month: %s", month_str)
 
-        # Select the desired day (removing any leading zero)
+        # Prepare the day string without any leading zero.
         day_str = scan_date.strftime("%d").lstrip("0")
-        day_button = wait_for_clickable(
-            driver, By.XPATH, f"//button/div[contains(.,'{day_str}')]"
-        )
+        logging.debug("Looking for day: %s", day_str)
+
+        # Narrow the scope to only elements inside the date-picker table container.
+        day_button_xpath = f"//div[contains(@class, 'v-date-picker-table--date')]//button[.//div[text()='{day_str}']]"
+        day_button = wait_for_clickable(driver, By.XPATH, day_button_xpath)
         day_button.click()
         logging.debug("Selected scan day: %s", day_str)
 

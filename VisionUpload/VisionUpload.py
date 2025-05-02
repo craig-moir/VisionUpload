@@ -287,6 +287,20 @@ def upload_scan_file(driver, file_path, scan_date, module_text, survey_text):
         logging.error("Save button not clickable for %s", file_path)
         raise
 
+    # wait for toast saying Saved Successfully by checking for that text anywhere
+    try:
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located(
+                (By.XPATH, "//*[contains(text(),'Successfully Saved')]")
+            )
+        )
+        logging.info("File saved successfully for %s", file_path)
+    except TimeoutException:
+        logging.error("Save confirmation not found for %s", file_path)
+        raise
+
+    time.sleep(1)  # Optional pause for the UI to stabilize
+
 
 def retry_action(action, retries=3, delay=2):
     """

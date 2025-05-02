@@ -269,7 +269,7 @@ def upload_scan_file(driver, file_path, scan_date, module_text, survey_text):
 
     # Wait until the upload completes (i.e. "Uploading" text is gone)
     try:
-        WebDriverWait(driver, 300).until_not(
+        WebDriverWait(driver, 600).until_not(
             EC.presence_of_element_located(
                 (By.XPATH, "//*[contains(text(),'Uploading')]")
             )

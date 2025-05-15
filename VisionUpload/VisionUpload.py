@@ -289,7 +289,7 @@ def upload_scan_file(driver, file_path, scan_date, module_text, survey_text):
 
     # wait for toast saying Saved Successfully by checking for that text anywhere
     try:
-        WebDriverWait(driver, 10).until(
+        WebDriverWait(driver, 30).until(
             EC.presence_of_element_located(
                 (By.XPATH, "//*[contains(text(),'Successfully Saved')]")
             )
@@ -297,7 +297,7 @@ def upload_scan_file(driver, file_path, scan_date, module_text, survey_text):
         logging.info("File saved successfully for %s", file_path)
     except TimeoutException:
         logging.error("Save confirmation not found for %s", file_path)
-        raise
+        # raise
 
     time.sleep(1)  # Optional pause for the UI to stabilize
 

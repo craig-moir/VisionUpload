@@ -299,7 +299,7 @@ def upload_scan_file(driver, file_path, scan_date, module_text, survey_text):
         logging.error("Save confirmation not found for %s", file_path)
         # raise
 
-    time.sleep(1)  # Optional pause for the UI to stabilize
+    time.sleep(5)  # Optional pause for the UI to stabilize
 
 
 def retry_action(action, retries=3, delay=2):
